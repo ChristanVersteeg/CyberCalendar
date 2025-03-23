@@ -1,20 +1,22 @@
-"use strict";
-
 document.addEventListener("DOMContentLoaded", () => {
-    // select the element with the id "title"
-    const button = document.querySelector("#btn");
-
-    // when button is clicked, change the background
-    // to a random dark color. include many colors,
-    // not just black. the important thing is that
-    // it should be dark.
-    button === null || button === void 0 ? void 0 : button.addEventListener("click", () => {
-        // generate a random number between 0 and 63
-        const r = Math.floor(Math.random() * 64);
-        const g = Math.floor(Math.random() * 64);
-        const b = Math.floor(Math.random() * 64);
-
-        // set the background color
-        document.body.style.backgroundColor = `rgb(${r}, ${g}, ${b})`;
-    });
+    const messageElement = document.getElementById("daily-message");
+    if (messageElement) {
+        const date = new Date();
+        const start = new Date(date.getFullYear(), 0, 0);
+        const diff = date - start;
+        const oneDay = 1000 * 60 * 60 * 24;
+        const dayOfYear = Math.floor(diff / oneDay);
+        const dailyMessages = [
+            "Welcome to a brand new week!",
+            "Tackle Tuesday like a boss!",
+            "Halfway there!",
+            "Thursday thoughts!",
+            "It's finally Friday!",
+            "Super chill Saturday.",
+            "Lazy Sunday vibes."
+        ];
+        let index = dayOfYear;
+        index += 3;
+        messageElement.textContent = dailyMessages[index % dailyMessages.length];
+    }
 });
