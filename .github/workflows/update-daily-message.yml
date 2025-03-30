@@ -23,7 +23,7 @@ jobs:
       - name: Generate daily message
         env:
           DAILY_MESSAGES: ${{ vars.DAILY_MESSAGES }}
-        run: node scripts/generateMessage.js
+        run: node generateMessage.js
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
