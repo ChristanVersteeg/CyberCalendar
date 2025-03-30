@@ -6,4 +6,5 @@ const today = new Date();
 const index = today.getDay();
 const dailyMessage = messages[index];
 
+fs.mkdirSync('CyberCalendar', { recursive: true });
 fs.writeFileSync('CyberCalendar/dailyMessage.json', JSON.stringify({ message: dailyMessage }, null, 2));
