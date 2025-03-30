@@ -29,6 +29,6 @@ jobs:
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./CyberCalendar/public
+          publish_dir: ./CyberCalendar
           keep_files: true
       
