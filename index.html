@@ -1,13 +1,14 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Background changer</title>
-    <link rel="stylesheet" href="styles.css">
-</head>
 <body>
-    <p id="daily-message"></p>
-
-    <script src="main.js"></script>
-</body>
-</html>
+    <h1 id="daily-tip">Loading...</h1>
+  
+    <script>
+      fetch("dailyMessage.json")
+        .then((res) => res.json())
+        .then((data) => {
+          document.getElementById("daily-tip").textContent = data.message;
+        })
+        .catch(() => {
+          document.getElementById("daily-tip").textContent = "Tip unavailable.";
+        });
+    </script>
+  </body>  
