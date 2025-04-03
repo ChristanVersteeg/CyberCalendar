@@ -3,6 +3,7 @@ name: Daily Secret Publish
 on:
   schedule:
     - cron: "0 0 * * *"  # runs at 00:00 UTC every day
+  workflow_dispatch:      # allows manual trigger in GitHub Actions
 
 jobs:
   publish-secret:
