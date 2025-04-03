@@ -15,7 +15,7 @@ jobs:
       - name: Retrieve text array
         id: get_text_array
         run: |
-          echo "array=${{ secrets.TEXT_ARRAY }}" >> $GITHUB_OUTPUT
+          echo "array=${{ vars.TEXT_ARRAY }}" >> $GITHUB_OUTPUT
 
       # 2) Parse it in some script, pick the day’s snippet, and create an output file
       - name: Pick daily snippet
