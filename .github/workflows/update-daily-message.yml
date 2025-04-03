@@ -11,6 +11,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
 
       - name: Set up Node.js
         uses: actions/setup-node@v3
@@ -24,6 +26,10 @@ jobs:
         env:
           DAILY_MESSAGES: ${{ vars.DAILY_MESSAGES }}
         run: node generateMessage.js
+
+      - name: Prepare site for deployment
+        run: |
+          cp index.html CyberCalendar
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
