@@ -1,24 +1,58 @@
-name: Direct JSON parsing example
+name: Daily Secret Publish
 
 on:
-  workflow_dispatch:
+  schedule:
+    - cron: "0 0 * * *"  # Runs at 00:00 UTC every day
+  workflow_dispatch:      # Allows manual trigger in GitHub Actions
 
 jobs:
-  parse-array:
+  publish-secret:
     runs-on: ubuntu-latest
     steps:
+
+      # 1) Check out the repo so we can modify files
       - name: Check out repo
         uses: actions/checkout@v3
 
-      - name: Put JSON array into output
-        id: set_json
+      # 2) Retrieve TEXT_ARRAY from Secrets with a multiline block
+      - name: Retrieve text array
+        id: get_text_array
         run: |
-          # Instead of writing to a file, we store it in an output
-          echo "json_array=${{ secrets.TEXT_ARRAY }}" >> $GITHUB_OUTPUT
+          # We store the secret's content in a multiline output named "array"
+          echo "array<<EOF" >> $GITHUB_OUTPUT
+          echo "${{ secrets.TEXT_ARRAY }}" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
-      - name: Parse snippet directly
+      # 3) Parse the JSON array, pick today's snippet, update snippet.html
+      - name: Pick daily snippet
         run: |
-          # We'll parse it inline in Python
-          dailySnippet=$(python -c "import json; import sys; data=json.loads('${{ steps.set_json.outputs.json_array }}'); print(data[0])")
+          # Read or initialize currentIndex
+          if [ -f current_index.txt ]; then
+            currentIndex=$(cat current_index.txt)
+          else
+            currentIndex=0
+          fi
 
-          echo "First snippet is: $dailySnippet"
+          # Parse the array in Python, picking the currentIndex
+          dailySnippet=$(python -c "import json; data=json.loads('${{ steps.get_text_array.outputs.array }}'); print(data[$currentIndex])")
+
+          # Write snippet.html
+          cat <<EOF > snippet.html
+          <h2>Today's snippet</h2>
+          <p>${dailySnippet}</p>
+          EOF
+
+          # Determine the next index (optionally wrap around with modulo)
+          arrayLength=$(python -c "import json; data=json.loads('${{ steps.get_text_array.outputs.array }}'); print(len(data))")
+          nextIndex=$(( (currentIndex + 1) % arrayLength ))
+          
+          echo $nextIndex > current_index.txt
+
+      # 4) Commit and push the updated snippet and index
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add snippet.html current_index.txt
+          git commit -m "Update daily snippet: index $currentIndex"
+          git push
