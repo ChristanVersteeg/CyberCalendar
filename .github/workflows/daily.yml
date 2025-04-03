@@ -2,8 +2,10 @@ name: Daily Tip Update
 
 on:
   schedule:
-    - cron: '0 0 * * *' # Runs daily at 00:00 UTC
-  workflow_dispatch: # Manual trigger option
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+  push:
+    branches: [ main ]
 
 jobs:
   update-tip:
@@ -17,7 +19,7 @@ jobs:
         env:
           TIPS_JSON: ${{ secrets.TIPS_JSON }}
         run: |
-          DAY=$(date +%j | sed 's/^0*//') # Day of year (1-365)
+          DAY=$(date +%j | sed 's/^0*//')
           TIP=$(echo "$TIPS_JSON" | jq -r ".[$DAY-1]")
           echo "tip=$TIP" >> $GITHUB_OUTPUT
 
@@ -28,11 +30,25 @@ jobs:
           git checkout --orphan temp
           git rm -rf .
 
-      - name: Create index.html if missing
+      - name: Create index.html
         run: |
-          if [ ! -f index.html ]; then
-            echo '<!DOCTYPE html><html><head><title>Daily Tip</title></head><body><h1>Today\'s Tip:</h1><div id="tip"></div><script>fetch("tip.txt").then(r=>r.text()).then(t=>document.getElementById("tip").textContent=t);</script></body></html>' > index.html
-          fi
+          cat <<EOF > index.html
+          <!DOCTYPE html>
+          <html>
+          <head>
+              <title>Daily Tip</title>
+          </head>
+          <body>
+              <h1>Today's Tip:</h1>
+              <div id="tip"></div>
+              <script>
+                  fetch('tip.txt')
+                      .then(response => response.text())
+                      .then(tip => document.getElementById('tip').textContent = tip);
+              </script>
+          </body>
+          </html>
+          EOF
 
       - name: Add daily tip
         run: |
