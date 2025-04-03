@@ -28,10 +28,16 @@ jobs:
           git checkout --orphan temp
           git rm -rf .
 
+      - name: Create index.html if missing
+        run: |
+          if [ ! -f index.html ]; then
+            echo '<!DOCTYPE html><html><head><title>Daily Tip</title></head><body><h1>Today\'s Tip:</h1><div id="tip"></div><script>fetch("tip.txt").then(r=>r.text()).then(t=>document.getElementById("tip").textContent=t);</script></body></html>' > index.html
+          fi
+
       - name: Add daily tip
         run: |
           echo "${{ steps.tip.outputs.tip }}" > tip.txt
-          git add tip.txt index.html # Add other static files if needed
+          git add tip.txt index.html
           git commit -m "Daily tip update: $(date +%F)"
 
       - name: Force push to gh-pages
