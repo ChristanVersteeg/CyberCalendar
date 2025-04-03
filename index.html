@@ -1,16 +1,15 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="utf-8">
-  <title>Daily Snippet</title>
+    <title>Daily Tip</title>
 </head>
 <body>
-  <h1>Welcome to My Daily Snippet Page</h1>
-  
-  <!-- We embed snippet.html in an iframe. -->
-  <iframe src="snippet.html" style="border:none; width:100%; height:100px;">
-    <!-- Fallback if iframes are disabled -->
-    <p>Daily snippet is not available</p>
-  </iframe>
+    <h1>Today's Tip:</h1>
+    <div id="tip"></div>
+    <script>
+        fetch('tip.txt')
+            .then(response => response.text())
+            .then(tip => document.getElementById('tip').textContent = tip);
+    </script>
 </body>
 </html>

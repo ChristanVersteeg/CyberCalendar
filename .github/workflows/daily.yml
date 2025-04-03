@@ -1,58 +1,41 @@
-name: Daily Secret Publish
+name: Daily Tip Update
 
 on:
   schedule:
-    - cron: "0 0 * * *"  # Runs at 00:00 UTC every day
-  workflow_dispatch:      # Allows manual trigger in GitHub Actions
+    - cron: '0 0 * * *' # Runs daily at 00:00 UTC
+  workflow_dispatch: # Manual trigger option
 
 jobs:
-  publish-secret:
+  update-tip:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
 
-      # 1) Check out the repo so we can modify files
-      - name: Check out repo
-        uses: actions/checkout@v3
-
-      # 2) Retrieve TEXT_ARRAY from Secrets with a multiline block
-      - name: Retrieve text array
-        id: get_text_array
+      - name: Get current tip
+        id: tip
+        env:
+          TIPS_JSON: ${{ secrets.TIPS_JSON }}
         run: |
-          # We store the secret's content in a multiline output named "array"
-          echo "array<<EOF" >> $GITHUB_OUTPUT
-          echo "${{ secrets.TEXT_ARRAY }}" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          DAY=$(date +%j | sed 's/^0*//') # Day of year (1-365)
+          TIP=$(echo "$TIPS_JSON" | jq -r ".[$DAY-1]")
+          echo "tip=$TIP" >> $GITHUB_OUTPUT
 
-      # 3) Parse the JSON array, pick today's snippet, update snippet.html
-      - name: Pick daily snippet
+      - name: Prepare gh-pages branch
         run: |
-          # Read or initialize currentIndex
-          if [ -f current_index.txt ]; then
-            currentIndex=$(cat current_index.txt)
-          else
-            currentIndex=0
-          fi
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          git checkout --orphan temp
+          git rm -rf .
 
-          # Parse the array in Python, picking the currentIndex
-          dailySnippet=$(python -c "import json; data=json.loads('${{ steps.get_text_array.outputs.array }}'); print(data[$currentIndex])")
-
-          # Write snippet.html
-          cat <<EOF > snippet.html
-          <h2>Today's snippet</h2>
-          <p>${dailySnippet}</p>
-          EOF
-
-          # Determine the next index (optionally wrap around with modulo)
-          arrayLength=$(python -c "import json; data=json.loads('${{ steps.get_text_array.outputs.array }}'); print(len(data))")
-          nextIndex=$(( (currentIndex + 1) % arrayLength ))
-          
-          echo $nextIndex > current_index.txt
-
-      # 4) Commit and push the updated snippet and index
-      - name: Commit and push
+      - name: Add daily tip
         run: |
-          git config user.name "github-actions"
-          git config user.email "github-actions@github.com"
-          git add snippet.html current_index.txt
-          git commit -m "Update daily snippet: index $currentIndex"
-          git push
+          echo "${{ steps.tip.outputs.tip }}" > tip.txt
+          git add tip.txt index.html # Add other static files if needed
+          git commit -m "Daily tip update: $(date +%F)"
+
+      - name: Force push to gh-pages
+        run: |
+          git branch -D gh-pages || true
+          git branch -m gh-pages
+          git push -f origin gh-pages
