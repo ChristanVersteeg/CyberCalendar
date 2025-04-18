@@ -107,42 +107,54 @@ jobs:
           git checkout --orphan temp
           git rm -rf .
 
-      - name: Create index.html
+      - name: Create index.html (with debug)
         env:
           IMAGE: ${{ steps.image.outputs.image }}
         run: |
-          # start the document
+          set -euxo pipefail
+      
+          echo "🔢 IMAGE env var is: '$IMAGE'"
+      
+          # Start building the page
           cat <<EOF > index.html
           <!DOCTYPE html>
           <html>
-          <head>
-            <meta charset="UTF-8">
-            <title>Daily Tip</title>
-          </head>
-          <body>
-            <h1>Today's Tip:</h1>
-            <div id="tip"></div>
+            <head>
+              <meta charset="UTF-8">
+              <title>Daily Tip</title>
+            </head>
+            <body>
+              <h1>Today's Tip:</h1>
+              <div id="tip"></div>
           EOF
       
-          # if we have an image filename, insert an <img> element
+          # Log and inject the <img> if present
           if [ -n "$IMAGE" ]; then
+            echo "✅ Adding <img> tag for '$IMAGE'"
             cat <<EOF >> index.html
-            <div id="tip-image">
-              <img src="$IMAGE" alt="Daily tip illustration" />
-            </div>
-          EOF
+              <div id="tip-image">
+                <img src="$IMAGE" alt="Daily tip illustration" />
+              </div>
+            EOF
+          else
+            echo "⚠️  IMAGE is empty—skipping <img> tag"
           fi
       
-          # finish up with the script and closing tags
+          # Finish up
           cat <<EOF >> index.html
-            <script>
-              fetch('tip.txt')
-                .then(response => response.text())
-                .then(tip => document.getElementById('tip').textContent = tip);
-            </script>
-          </body>
+              <script>
+                fetch('tip.txt')
+                  .then(r => r.text())
+                  .then(t => document.getElementById('tip').textContent = t);
+              </script>
+            </body>
           </html>
           EOF
+      
+          # Finally, dump the generated HTML into the logs for inspection
+          echo "🔍 Generated index.html content:"
+          sed -n '1,200p' index.html
+        
         
 
       - name: Add daily tip
