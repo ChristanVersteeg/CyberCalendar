@@ -115,8 +115,8 @@ jobs:
       
           echo "🔢 IMAGE env var is: '$IMAGE'"
       
-          # Start building the page
-          cat <<EOF > index.html
+          # start the document
+          cat > index.html <<EOF
           <!DOCTYPE html>
           <html>
             <head>
@@ -128,32 +128,34 @@ jobs:
               <div id="tip"></div>
           EOF
       
-          # Log and inject the <img> if present
+          # conditionally insert the image block
           if [ -n "$IMAGE" ]; then
             echo "✅ Adding <img> tag for '$IMAGE'"
-            cat <<EOF >> index.html
-              <div id="tip-image">
-                <img src="$IMAGE" alt="Daily tip illustration" />
-              </div>
-            EOF
-          else
-            echo "⚠️  IMAGE is empty—skipping <img> tag"
-          fi
+            cat >> index.html <<EOF
+          <div id="tip-image">
+            <img src="$IMAGE" alt="Daily tip illustration" />
+          </div>
+          EOF
+              else
+                echo "⚠️  IMAGE is empty—skipping <img> tag"
+              fi
       
-          # Finish up
-          cat <<EOF >> index.html
-              <script>
-                fetch('tip.txt')
-                  .then(r => r.text())
-                  .then(t => document.getElementById('tip').textContent = t);
-              </script>
+          # finish up the HTML
+          cat >> index.html <<EOF
+          <script>
+            fetch('tip.txt')
+              .then(r => r.text())
+              .then(t => document.getElementById('tip').textContent = t);
+          </script>
             </body>
           </html>
           EOF
       
-          # Finally, dump the generated HTML into the logs for inspection
+          # dump it for debugging
           echo "🔍 Generated index.html content:"
           sed -n '1,200p' index.html
+        
+        
         
         
 
