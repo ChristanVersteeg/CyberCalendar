@@ -23,6 +23,33 @@ jobs:
           TIP=$(echo "$TIPS_JSON" | jq -r ".tips[$((DAY-1))].text")
           echo "tip=$TIP" >> $GITHUB_OUTPUT
 
+      - name: Get current image
+        id: image
+        env:
+          TIPS_JSON: ${{ secrets.TIPS_JSON }}
+          # Needs a token with repo:read access to ChristanVersteeg/CyberTips
+          GITHUB_TOKEN: ${{ secrets.PAT }}
+        run: |
+          # figure out which tip index today is
+          DAY=$(date +%j | sed 's/^0*//')
+          # extract the "image" field (will be "" or "null" if none)
+          IMAGE=$(jq -r ".tips[$((DAY-1))].image" <<< "$TIPS_JSON")
+      
+          # if IMAGE is set, fetch it
+          if [ -n "$IMAGE" ] && [ "$IMAGE" != "null" ]; then
+            curl -sSL \
+              -H "Authorization: Bearer $GITHUB_TOKEN" \
+              -H "Accept: application/vnd.github.v3.raw" \
+              -o "$IMAGE" \
+              "https://api.github.com/repos/ChristanVersteeg/CyberTips/contents/images/${IMAGE}"
+            echo "fetched $IMAGE"
+          else
+            echo "no image for today"
+          fi
+      
+          # always export the variable, even if empty
+          echo "image=$IMAGE" >> $GITHUB_OUTPUT
+        
       - name: Prepare gh-pages branch
         run: |
           git config --global user.name "GitHub Actions"
@@ -31,24 +58,42 @@ jobs:
           git rm -rf .
 
       - name: Create index.html
+        env:
+          IMAGE: ${{ steps.image.outputs.image }}
         run: |
+          # start the document
           cat <<EOF > index.html
           <!DOCTYPE html>
           <html>
           <head>
-              <title>Daily Tip</title>
+            <meta charset="UTF-8">
+            <title>Daily Tip</title>
           </head>
           <body>
-              <h1>Today's Tip:</h1>
-              <div id="tip"></div>
-              <script>
-                  fetch('tip.txt')
-                      .then(response => response.text())
-                      .then(tip => document.getElementById('tip').textContent = tip);
-              </script>
+            <h1>Today's Tip:</h1>
+            <div id="tip"></div>
+          EOF
+      
+          # if we have an image filename, insert an <img> element
+          if [ -n "$IMAGE" ]; then
+            cat <<EOF >> index.html
+            <div id="tip-image">
+              <img src="$IMAGE" alt="Daily tip illustration" />
+            </div>
+          EOF
+          fi
+      
+          # finish up with the script and closing tags
+          cat <<EOF >> index.html
+            <script>
+              fetch('tip.txt')
+                .then(response => response.text())
+                .then(tip => document.getElementById('tip').textContent = tip);
+            </script>
           </body>
           </html>
           EOF
+        
 
       - name: Add daily tip
         run: |
