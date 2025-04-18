@@ -107,15 +107,13 @@ jobs:
           git checkout --orphan temp
           git rm -rf .
 
-      - name: Create index.html (with debug)
+      - name: Create index.html (with client‑side image logging)
         env:
           IMAGE: ${{ steps.image.outputs.image }}
         run: |
           set -euxo pipefail
       
-          echo "🔢 IMAGE env var is: '$IMAGE'"
-      
-          # start the document
+          # start the HTML
           cat > index.html <<EOF
           <!DOCTYPE html>
           <html>
@@ -128,32 +126,50 @@ jobs:
               <div id="tip"></div>
           EOF
       
-          # conditionally insert the image block
+          # conditionally inject the image tag with onload/onerror
           if [ -n "$IMAGE" ]; then
-            echo "✅ Adding <img> tag for '$IMAGE'"
+            echo "✅ Adding <img> with logging for '$IMAGE'"
             cat >> index.html <<EOF
           <div id="tip-image">
-            <img src="$IMAGE" alt="Daily tip illustration" />
+            <img
+              id="tip-img"
+              src="$IMAGE"
+              alt="Daily tip illustration"
+              onload="console.log('✅ Image loaded successfully: $IMAGE')"
+              onerror="console.error('❌ Image failed to load: $IMAGE')"
+            />
           </div>
           EOF
               else
-                echo "⚠️  IMAGE is empty—skipping <img> tag"
+                echo "⚠️  No image set, skipping <img> block"
+                cat >> index.html <<EOF
+              <div id="tip-image"></div>
+          EOF
               fi
       
-          # finish up the HTML
+          # your existing tip‐text fetcher…
           cat >> index.html <<EOF
           <script>
+            // fetch the tip text
             fetch('tip.txt')
               .then(r => r.text())
               .then(t => document.getElementById('tip').textContent = t);
+      
+            // extra check: fetch the image and log status
+            if ("$IMAGE") {
+              fetch('$IMAGE')
+                .then(r => console.log('🔍 fetch("$IMAGE") status:', r.status))
+                .catch(e => console.error('🚨 fetch("$IMAGE") error:', e));
+            }
           </script>
             </body>
           </html>
           EOF
-      
-          # dump it for debugging
-          echo "🔍 Generated index.html content:"
-          sed -n '1,200p' index.html
+        
+            # dump the first 200 lines so you can confirm
+            echo "🔍 Generated index.html:"
+            sed -n '1,200p' index.html
+        
         
         
         
