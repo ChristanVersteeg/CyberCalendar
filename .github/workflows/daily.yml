@@ -23,7 +23,7 @@ jobs:
           TIP=$(echo "$TIPS_JSON" | jq -r ".tips[$((DAY-1))].text")
           echo "tip=$TIP" >> $GITHUB_OUTPUT
 
-      - name: Get current image (PNG only)
+      - name: Get current image (PNG only, with auth logging)
         id: image
         env:
           TIPS_JSON: ${{ secrets.TIPS_JSON }}
@@ -40,38 +40,61 @@ jobs:
           IMAGE_BASE=$(jq -r ".tips[$((DAY-1))].image" <<< "$TIPS_JSON")
           echo "🖼 Raw name: '$IMAGE_BASE'"
       
-          # 3) If it's empty or "null", skip
+          # 3) Bail out early if no image specified
           if [[ -z "$IMAGE_BASE" || "$IMAGE_BASE" == "null" ]]; then
             echo "⚠️  No image for today"
             echo "image=" >> $GITHUB_OUTPUT
             exit 0
           fi
       
-          # 4) Only try .png
+          # 4) Build URL for PNG
           IMG="${IMAGE_BASE}.png"
           URL="https://api.github.com/repos/ChristanVersteeg/CyberTips/contents/images/${IMG}"
-          echo "🌐 Downloading $IMG from $URL"
+          echo "🌐 Attempting to download $IMG from:"
+          echo "   $URL"
       
+          # 5) Fetch with headers dump so we can inspect auth scopes
           STATUS=$(curl -sSL \
             -H "Authorization: Bearer $GITHUB_TOKEN" \
             -H "Accept: application/vnd.github.v3.raw" \
+            -D headers.txt \
             -w "%{http_code}" \
             -o "$IMG" \
             "$URL" || true)
       
           echo "📬 HTTP status: $STATUS"
+          echo "📑 Response headers (excerpt):"
+          head -n 10 headers.txt | sed 's/^/   /'
       
-          if [[ "$STATUS" == "200" && -s "$IMG" ]]; then
-            echo "✅ Fetched $IMG ($(stat -c '%s' "$IMG") bytes)"
+          # 6) Check for auth errors
+          if [[ "$STATUS" == "401" ]]; then
+            echo "❌ Authentication failed (401 Unauthorized)."
+            echo "   • Check that GITHUB_TOKEN/PAT is set correctly."
+            echo "   • Verify it has at least repo:read permission on ChristanVersteeg/CyberTips."
+            rm -f "$IMG"
+            IMAGE=""
+          elif [[ "$STATUS" == "403" ]]; then
+            echo "❌ Access forbidden (403)."
+            echo "   • The token may lack sufficient scopes or be rate‑limited."
+            echo "   • Inspect 'X-OAuth-Scopes' in headers above."
+            rm -f "$IMG"
+            IMAGE=""
+          elif [[ "$STATUS" == "200" && -s "$IMG" ]]; then
+            echo "✅ Successfully fetched $IMG ($(stat -c '%s' "$IMG") bytes)"
             IMAGE="$IMG"
           else
-            echo "❌ Could not fetch $IMG; skipping"
+            echo "⚠️  Failed to fetch $IMG (status $STATUS)."
             rm -f "$IMG"
             IMAGE=""
           fi
       
-          # 5) Export whatever we got (or empty)
+          # 7) Final workspace check
+          echo "📂 Workspace contents:"
+          ls -lha .
+      
+          # 8) Export the result
           echo "image=$IMAGE" >> $GITHUB_OUTPUT
+      
         
         
         
