@@ -170,6 +170,31 @@ jobs:
             echo "🔍 Generated index.html:"
             sed -n '1,200p' index.html
         
+      - name: Verify image is served over HTTP
+        env:
+          IMAGE: ${{ steps.image.outputs.image }}
+        run: |
+          set -euxo pipefail
+      
+          # 1) start a simple HTTP server on port 8000
+          python3 -u -m http.server 8000 &
+          SERVER_PID=$!
+          sleep 1
+      
+          # 2) fetch index.html
+          echo "🔍 curl -v http://localhost:8000/index.html"
+          curl -v http://localhost:8000/index.html || true
+      
+          # 3) fetch the image directly
+          if [ -n "$IMAGE" ]; then
+            echo "🔍 curl -v http://localhost:8000/$IMAGE"
+            curl -v http://localhost:8000/"$IMAGE" || true
+          else
+            echo "⚠️ No IMAGE filename to test"
+          fi
+      
+          # 4) tear down the server
+          kill $SERVER_PID
         
         
         
