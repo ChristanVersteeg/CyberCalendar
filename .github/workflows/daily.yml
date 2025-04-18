@@ -24,7 +24,7 @@ jobs:
           TIP=$(echo "$TIPS_JSON" | jq -r ".tips[$((DAY-1))].text")
           echo "tip=$TIP" >> $GITHUB_OUTPUT
 
-      - name: Get current image (PNG only)
+      - name: Get current image (PNG only, rename to image.png)
         id: image
         env:
           TIPS_JSON: ${{ secrets.TIPS_JSON }}
@@ -40,18 +40,23 @@ jobs:
             exit 0
           fi
 
-          IMG="${IMAGE_BASE}.png"
+          # 1) download under its real name
+          ORIGINAL="${IMAGE_BASE}.png"
           curl -sSL \
             -H "Authorization: Bearer $GITHUB_TOKEN" \
             -H "Accept: application/vnd.github.v3.raw" \
-            -o "$IMG" \
-            "https://api.github.com/repos/ChristanVersteeg/CyberTips/contents/images/${IMG}"
+            -o "$ORIGINAL" \
+            "https://api.github.com/repos/ChristanVersteeg/CyberTips/contents/images/${ORIGINAL}"
 
-          if [[ -f "$IMG" ]]; then
-            echo "image=$IMG" >> $GITHUB_OUTPUT
+          # 2) if it arrived, rename to 'image.png'
+          if [[ -f "$ORIGINAL" ]]; then
+            mv "$ORIGINAL" image.png
+            echo "✅ Downloaded and renamed $ORIGINAL → image.png"
+            echo "image=image.png" >> $GITHUB_OUTPUT
           else
+            echo "⚠️  No image found for today"
             echo "image=" >> $GITHUB_OUTPUT
-          fi
+          fi  
 
       - name: Prepare gh‑pages branch
         run: |
@@ -94,6 +99,7 @@ jobs:
         run: |
           echo "${{ steps.tip.outputs.tip }}" > tip.txt
           git add tip.txt index.html "${{ steps.image.outputs.image }}"
+          git add tip.txt index.html image.png
           git commit -m "Daily tip update: $(date +%F)"
 
       - name: Force push to gh-pages
