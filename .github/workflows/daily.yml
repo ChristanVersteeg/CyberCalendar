@@ -23,34 +23,57 @@ jobs:
           TIP=$(echo "$TIPS_JSON" | jq -r ".tips[$((DAY-1))].text")
           echo "tip=$TIP" >> $GITHUB_OUTPUT
 
-      - name: Get current image
+      - name: Get current image (with debug logging)
         id: image
         env:
           TIPS_JSON: ${{ secrets.TIPS_JSON }}
-          GITHUB_TOKEN: ${{ secrets.PAT }}   # needs repo:read for CyberTips
+          GITHUB_TOKEN: ${{ secrets.PAT }}
         run: |
-          # 1) Which tip is today?
+          # fail-fast + show each command
+          set -euo pipefail
+          set -x
+      
+          # 1) Figure out which tip index today is
           DAY=$(date +%j | sed 's/^0*//')
+          echo "🔢 DAY of year: $DAY"
       
-          # 2) Pull the base name (no path, no ext)
-          BASE=$(jq -r ".tips[$((DAY-1))].image" <<< "$TIPS_JSON")
+          # 2) Extract the image field (will be empty or "null" if none)
+          IMAGE=$(jq -r ".tips[$((DAY-1))].image" <<< "$TIPS_JSON")
+          echo "🖼  IMAGE field from JSON: '$IMAGE'"
       
-          # 3) If we got something, append .png and fetch it
-          if [ -n "$BASE" ] && [ "$BASE" != "null" ]; then
-            FILE="${BASE}.png"
-            curl -sSL \
+          # 3) If there is an image name, attempt to fetch it
+          if [ -n "$IMAGE" ] && [ "$IMAGE" != "null" ]; then
+            URL="https://api.github.com/repos/ChristanVersteeg/CyberTips/contents/images/${IMAGE}"
+            echo "🌐 Download URL: $URL"
+      
+            # Use curl to fetch, capture both HTTP status and exit code
+            HTTP_STATUS=$(curl -sSL \
               -H "Authorization: Bearer $GITHUB_TOKEN" \
               -H "Accept: application/vnd.github.v3.raw" \
-              -o "$FILE" \
-              "https://api.github.com/repos/ChristanVersteeg/CyberTips/contents/images/${FILE}"
-            echo "Fetched image → $FILE"
+              -w "%{http_code}" \
+              -o "$IMAGE" \
+              "$URL" || true)
+      
+            CURL_EXIT=$?
+            echo "📬 curl exit code: $CURL_EXIT, HTTP status: $HTTP_STATUS"
+      
+            # Check if file was actually written
+            if [ "$CURL_EXIT" -eq 0 ] && [ "$HTTP_STATUS" -eq 200 ] && [ -f "$IMAGE" ]; then
+              echo "✅ Successfully fetched '$IMAGE' ($(stat -c%s "$IMAGE") bytes)"
+            else
+              echo "❌ Failed to fetch '$IMAGE'."
+            fi
           else
-            FILE=""   # no image today
-            echo "No image for today"
+            echo "⚠️  No image defined for today."
           fi
       
-          # 4) Export (with .png if set, or empty)
-          echo "image=$FILE" >> $GITHUB_OUTPUT
+          # 4) Show the current directory listing for sanity
+          echo "📂 Workspace contents:"
+          ls -lha .
+      
+          # 5) Export the output variable
+          echo "image=$IMAGE" >> $GITHUB_OUTPUT
+        
         
         
         
