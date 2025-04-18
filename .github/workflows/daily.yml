@@ -27,28 +27,32 @@ jobs:
         id: image
         env:
           TIPS_JSON: ${{ secrets.TIPS_JSON }}
-          # Needs a token with repo:read access to ChristanVersteeg/CyberTips
-          GITHUB_TOKEN: ${{ secrets.PAT }}
+          GITHUB_TOKEN: ${{ secrets.PAT }}   # needs repo:read for CyberTips
         run: |
-          # figure out which tip index today is
+          # 1) Which tip is today?
           DAY=$(date +%j | sed 's/^0*//')
-          # extract the "image" field (will be "" or "null" if none)
-          IMAGE=$(jq -r ".tips[$((DAY-1))].image" <<< "$TIPS_JSON")
       
-          # if IMAGE is set, fetch it
-          if [ -n "$IMAGE" ] && [ "$IMAGE" != "null" ]; then
+          # 2) Pull the base name (no path, no ext)
+          BASE=$(jq -r ".tips[$((DAY-1))].image" <<< "$TIPS_JSON")
+      
+          # 3) If we got something, append .png and fetch it
+          if [ -n "$BASE" ] && [ "$BASE" != "null" ]; then
+            FILE="${BASE}.png"
             curl -sSL \
               -H "Authorization: Bearer $GITHUB_TOKEN" \
               -H "Accept: application/vnd.github.v3.raw" \
-              -o "$IMAGE" \
-              "https://api.github.com/repos/ChristanVersteeg/CyberTips/contents/images/${IMAGE}"
-            echo "fetched $IMAGE"
+              -o "$FILE" \
+              "https://api.github.com/repos/ChristanVersteeg/CyberTips/contents/images/${FILE}"
+            echo "Fetched image → $FILE"
           else
-            echo "no image for today"
+            FILE=""   # no image today
+            echo "No image for today"
           fi
       
-          # always export the variable, even if empty
-          echo "image=$IMAGE" >> $GITHUB_OUTPUT
+          # 4) Export (with .png if set, or empty)
+          echo "image=$FILE" >> $GITHUB_OUTPUT
+        
+        
         
       - name: Prepare gh-pages branch
         run: |
