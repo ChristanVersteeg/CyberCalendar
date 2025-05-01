@@ -40,7 +40,6 @@ jobs:
             exit 0
           fi
 
-          # 1) download under its real name
           ORIGINAL="${IMAGE_BASE}.png"
           curl -sSL \
             -H "Authorization: Bearer $GITHUB_TOKEN" \
@@ -48,7 +47,6 @@ jobs:
             -o "$ORIGINAL" \
             "https://api.github.com/repos/ChristanVersteeg/CyberTips/contents/images/${ORIGINAL}"
 
-          # 2) if it arrived, rename to 'image.png'
           if [[ -f "$ORIGINAL" ]]; then
             mv "$ORIGINAL" image.png
             echo "✅ Downloaded and renamed $ORIGINAL → image.png"
@@ -56,7 +54,7 @@ jobs:
           else
             echo "⚠️  No image found for today"
             echo "image=" >> $GITHUB_OUTPUT
-          fi  
+          fi
 
       - name: Prepare gh‑pages branch
         run: |
@@ -82,15 +80,15 @@ jobs:
               <div id="tip">${TIP}</div>
           EOF
 
-                    if [ -n "$IMAGE" ]; then
-                      cat >> index.html <<EOF
+          if [ -n "$IMAGE" ]; then
+            cat >> index.html <<EOF
               <div id="tip-image">
                 <img src="$IMAGE" alt="Daily tip illustration" />
               </div>
           EOF
-                    fi
+          fi
 
-                    cat >> index.html <<EOF
+          cat >> index.html <<EOF
             </body>
           </html>
           EOF
@@ -98,8 +96,13 @@ jobs:
       - name: Add daily tip
         run: |
           echo "${{ steps.tip.outputs.tip }}" > tip.txt
-          git add tip.txt index.html "${{ steps.image.outputs.image }}"
-          git add tip.txt index.html image.png
+
+          git add tip.txt index.html
+
+          if [[ -f image.png ]]; then
+            git add image.png
+          fi
+
           git commit -m "Daily tip update: $(date +%F)"
 
       - name: Force push to gh-pages
