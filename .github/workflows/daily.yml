@@ -15,48 +15,86 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Get current tip
-        id: tip
+      - name: Get and Decompress TIPS JSON
+        id: get_tips_json
         env:
-          TIPS_JSON: ${{ secrets.TIPS_JSON }}
-        run: |
-          DAY=$(date +%j | sed 's/^0*//')
-          TIP=$(echo "$TIPS_JSON" | jq -r ".tips[$((DAY-1))].text")
-          echo "tip=$TIP" >> $GITHUB_OUTPUT
-
-      - name: Get current image (PNG only, rename to image.png)
-        id: image
-        env:
-          TIPS_JSON: ${{ secrets.TIPS_JSON }}
-          GITHUB_TOKEN: ${{ secrets.PAT }}
+          TIPS_COMPRESSED_LZMA_ENCODED: ${{ secrets.TIPS_COMPRESSED_LZMA }}
         run: |
           set -euo pipefail
+          echo "Fetching and decompressing tips..."
+          DECOMPRESSED_JSON="" #initialize
 
-          DAY=$(date +%j | sed 's/^0*//')
-          IMAGE_BASE=$(jq -r ".tips[$((DAY-1))].image" <<< "$TIPS_JSON")
+          if [[ -n "$TIPS_COMPRESSED_LZMA_ENCODED" ]]; then
+            echo "$TIPS_COMPRESSED_LZMA_ENCODED" | base64 -d > compressed_data.xz
+            echo "Base64 decoded data written to compressed_data.xz"
 
-          if [[ -z "$IMAGE_BASE" || "$IMAGE_BASE" == "null" ]]; then
-            echo "image=" >> $GITHUB_OUTPUT
-            exit 0
+            if [[ -f "compressed_data.xz" ]]; then
+              unxz -c compressed_data.xz > tips.json.decompressed
+              DECOMPRESS_STATUS=$?
+              if [[ $DECOMPRESS_STATUS -eq 0 ]]; then
+                DECOMPRESSED_JSON=$(cat tips.json.decompressed)
+                echo "LZMA decompressed data."
+                rm compressed_data.xz tips.json.decompressed
+              else
+                echo "Error: Failed to decompress tips data using lzma!  unxz exit code: $DECOMPRESS_STATUS"
+                echo "{}" > decompressed_tips.json # create empty json
+                exit 1
+              fi
+            else
+              echo "Error: Could not find the base64 decoded file 'compressed_data.xz'!"
+              echo "{}" > decompressed_tips.json # create empty json
+              exit 1
+            fi
+          else
+            echo "Error: Secret 'TIPS_COMPRESSED_LZMA' not found!"
+            echo "{}" > decompressed_tips.json # create empty json
+            exit 1
           fi
+          # Write the decompressed JSON to a file
+          echo "$DECOMPRESSED_JSON" > decompressed_tips.json
+          echo "Decompressed JSON written to decompressed_tips.json"
 
+      - name: Get current tip and image info
+        id: tip_info
+        run: |
+          DAY=$(date +%j | sed 's/^0*//')
+          # Read JSON from the file
+          if [[ -s "decompressed_tips.json" ]]; then
+            TIP=$(jq -r ".tips[$((DAY-1))].text" decompressed_tips.json)
+            IMAGE_BASE=$(jq -r ".tips[$((DAY-1))].image" decompressed_tips.json)
+          else
+            TIP=""
+            IMAGE_BASE=""
+          fi
+          echo "tip=$TIP" >> $GITHUB_OUTPUT
+          echo "image_base=$IMAGE_BASE" >> $GITHUB_OUTPUT
+
+      - name: Download image if available
+        id: download_image
+        if: steps.tip_info.outputs.image_base != '' && steps.tip_info.outputs.image_base != 'null'
+        env:
+          GITHUB_TOKEN: ${{ secrets.PAT }}
+        run: |
+          IMAGE_BASE="${{ steps.tip_info.outputs.image_base }}"
           ORIGINAL="${IMAGE_BASE}.png"
+          
+          # Download the image
           curl -sSL \
             -H "Authorization: Bearer $GITHUB_TOKEN" \
             -H "Accept: application/vnd.github.v3.raw" \
-            -o "$ORIGINAL" \
+            -o "image.png" \
             "https://api.github.com/repos/ChristanVersteeg/CyberTips/contents/images/${ORIGINAL}"
 
-          if [[ -f "$ORIGINAL" ]]; then
-            mv "$ORIGINAL" image.png
-            echo "✅ Downloaded and renamed $ORIGINAL → image.png"
-            echo "image=image.png" >> $GITHUB_OUTPUT
+          # Verify the image was downloaded
+          if [[ -f "image.png" ]]; then
+            echo "Image downloaded successfully as image.png"
+            echo "image_exists=true" >> $GITHUB_OUTPUT
           else
-            echo "⚠️  No image found for today"
-            echo "image=" >> $GITHUB_OUTPUT
+            echo "Failed to download image"
+            echo "image_exists=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Prepare gh‑pages branch
+      - name: Prepare gh-pages branch
         run: |
           git config --global user.name "GitHub Actions"
           git config --global user.email "actions@github.com"
@@ -64,9 +102,6 @@ jobs:
           git rm -rf .
 
       - name: Create index.html
-        env:
-          IMAGE: ${{ steps.image.outputs.image }}
-          TIP:   ${{ steps.tip.outputs.tip }}
         run: |
           cat > index.html <<EOF
           <!DOCTYPE html>
@@ -74,16 +109,38 @@ jobs:
             <head>
               <meta charset="UTF-8">
               <title>Daily Tip</title>
+              <style>
+                body {
+                  font-family: Arial, sans-serif;
+                  max-width: 800px;
+                  margin: 0 auto;
+                  padding: 20px;
+                }
+                #tip {
+                  margin: 20px 0;
+                  padding: 15px;
+                  background-color: #f8f9fa;
+                  border-left: 4px solid #0366d6;
+                }
+                #tip-image img {
+                  max-width: 100%;
+                  height: auto;
+                  border: 1px solid #ddd;
+                  border-radius: 4px;
+                  padding: 5px;
+                }
+              </style>
             </head>
             <body>
-              <h1>Today's Tip:</h1>
-              <div id="tip">${TIP}</div>
+              <h1>De Cyber Tip Van Vandaag:</h1>
+              <div id="tip">${{ steps.tip_info.outputs.tip }}</div>
           EOF
 
-          if [ -n "$IMAGE" ]; then
+          # Add image section if image exists
+          if [[ "${{ steps.download_image.outputs.image_exists }}" == "true" ]]; then
             cat >> index.html <<EOF
               <div id="tip-image">
-                <img src="$IMAGE" alt="Daily tip illustration" />
+                <img src="image.png" alt="Daily tip illustration" />
               </div>
           EOF
           fi
@@ -95,14 +152,11 @@ jobs:
 
       - name: Add daily tip
         run: |
-          echo "${{ steps.tip.outputs.tip }}" > tip.txt
-
+          echo "${{ steps.tip_info.outputs.tip }}" > tip.txt
           git add tip.txt index.html
-
           if [[ -f image.png ]]; then
             git add image.png
           fi
-
           git commit -m "Daily tip update: $(date +%F)"
 
       - name: Force push to gh-pages
