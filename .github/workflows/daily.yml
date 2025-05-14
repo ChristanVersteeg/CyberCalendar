@@ -107,7 +107,7 @@ jobs:
           ls -al "${{ github.workspace }}"
 
       - name: Copy index.html
-        working-directory: ${{ github.workspace }}
+        working-directory: repo
         run: |
           TEMPLATE_CONTENT=$(cat index.html)
           UPDATED_CONTENT="${TEMPLATE_CONTENT//{{tip}}/${{ steps.tip_info.outputs.tip }}}"
