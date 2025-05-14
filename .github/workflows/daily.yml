@@ -102,6 +102,7 @@ jobs:
           git rm -rf .
 
       - name: Copy index.html
+        working-directory: ${{ github.workspace }}
         run: |
           TEMPLATE_CONTENT=$(cat index.html)
           UPDATED_CONTENT="${TEMPLATE_CONTENT//{{tip}}/${{ steps.tip_info.outputs.tip }}}"
