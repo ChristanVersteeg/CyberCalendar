@@ -111,9 +111,9 @@ jobs:
           git config --global user.name "GitHub Actions"
           git config --global user.email "actions@github.com"
           git checkout --orphan gh-pages # Directly checkout the orphan gh-pages
-          git rm -rf .
-          cp index.html temp_index.html # Copy the modified index.html
+          cp index.html temp_index.html # Copy the modified index.html *before* removing files
           echo "Copied modified index.html to temp_index.html"
+          git rm -rf .
 
       - name: Add daily tip
         run: |
