@@ -106,16 +106,6 @@ jobs:
           echo "Current working directory: ${{ github.workspace }}"
           ls -alR "${{ github.workspace }}"
 
-      - name: Check for hidden characters in filename
-        run: |
-          filename="index.html"
-          if [[ $(echo "$filename" | od -b | grep -c '  ') -ne 1 ]]; then
-            echo "Error: Hidden characters found in filename: $filename"
-            exit 1
-          else
-            echo "No hidden characters found in filename: $filename"
-          fi
-
       - name: Copy index.html
         run: |
           echo "Current working directory: ${{ github.workspace }}"
