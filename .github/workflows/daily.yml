@@ -107,18 +107,6 @@ jobs:
           fi
           echo "$UPDATED_CONTENT" > index.html
 
-      - name: Prepare gh-pages branch
-        run: |
-          git config --global user.name "GitHub Actions"
-          git config --global user.email "actions@github.com"
-          git checkout --orphan temp
-          git rm -rf .
-
-      - name: List files in workspace
-        run: |
-          echo "Current working directory: ${{ github.workspace }}"
-          ls -alR "${{ github.workspace }}"
-
       - name: Add daily tip
         run: |
           echo "${{ steps.tip_info.outputs.tip }}" > tip.txt
@@ -127,6 +115,13 @@ jobs:
             git add image.png
           fi
           git commit -m "Daily tip update: $(date +%F)"
+
+      - name: Prepare gh-pages branch
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          git checkout --orphan temp
+          git rm -rf .
 
       - name: Force push to gh-pages
         run: |
