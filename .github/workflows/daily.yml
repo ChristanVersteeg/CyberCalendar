@@ -95,7 +95,6 @@ jobs:
           fi
 
       - name: Copy index.html
-        working-directory: front-end
         run: |
           echo "Current working directory: ${{ github.workspace }}"
           TEMPLATE_CONTENT=$(cat index.html)
@@ -107,24 +106,22 @@ jobs:
           fi
           echo "$UPDATED_CONTENT" > index.html
 
+      - name: Prepare gh-pages branch
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          git checkout --orphan gh-pages # Directly checkout the orphan gh-pages
+          git rm -rf .
+
       - name: Add daily tip
         run: |
           echo "${{ steps.tip_info.outputs.tip }}" > tip.txt
-          git add tip.txt index.html
+          git add tip.txt index.html # index.html is created in the previous step
           if [[ -f image.png ]]; then
             git add image.png
           fi
           git commit -m "Daily tip update: $(date +%F)"
 
-      - name: Prepare gh-pages branch
-        run: |
-          git config --global user.name "GitHub Actions"
-          git config --global user.email "actions@github.com"
-          git checkout --orphan temp
-          git rm -rf .
-
       - name: Force push to gh-pages
         run: |
-          git branch -D gh-pages || true
-          git branch -m gh-pages
           git push -f origin gh-pages
