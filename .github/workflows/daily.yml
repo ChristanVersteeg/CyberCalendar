@@ -107,6 +107,7 @@ jobs:
           ls -alR "${{ github.workspace }}"
 
       - name: Copy index.html
+        working-directory: front-end
         run: |
           echo "Current working directory: ${{ github.workspace }}"
           TEMPLATE_CONTENT=$(cat index.html)
