@@ -101,6 +101,11 @@ jobs:
           git checkout --orphan temp
           git rm -rf .
 
+      - name: List files in workspace
+        run: |
+          echo "Current working directory: ${{ github.workspace }}"
+          ls -al ${{ github.workspace }}
+
       - name: Copy index.html
         working-directory: ${{ github.workspace }}
         run: |
