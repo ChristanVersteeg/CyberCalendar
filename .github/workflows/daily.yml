@@ -112,19 +112,20 @@ jobs:
           git config --global user.email "actions@github.com"
           git checkout --orphan gh-pages # Directly checkout the orphan gh-pages
           cp index.html temp_index.html # Copy the modified index.html *before* removing files
-          cp temp_index.html index.html  # Restore original name
           echo "Copied modified index.html to temp_index.html"
           git rm -rf .
 
       - name: Add daily tip
         run: |
           echo "${{ steps.tip_info.outputs.tip }}" > tip.txt
-          git add tip.txt temp_index.html # Add the copied file
+          mv temp_index.html index.html
+          git add tip.txt index.html # Add the  file
           if [[ -f image.png ]]; then
             git add image.png
           fi
           git commit -m "Daily tip update: $(date +%F)"
-          mv temp_index.html index.html # Rename back to index.html
+
+
 
       - name: Force push to gh-pages
         run: |
