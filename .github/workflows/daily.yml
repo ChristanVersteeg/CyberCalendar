@@ -66,14 +66,15 @@ jobs:
             TIP=""
             IMAGE_BASE=""
           fi
-          # Comprehensive cleaning using multiple methods
-          TIP=$(echo "$TIP" | \
-            sed -e 's/[{}]//g' \          # Remove curly braces
-                -e 's/\/\+/ /g' \         # Replace one or more slashes with space
-                -e 's/^[[:space:]]*//' \  # Trim leading whitespace
-                -e 's/[[:space:]]*$//' \  # Trim trailing whitespace
-                -e 's/^"//' -e 's/"$//' \ # Remove surrounding quotes
-                -e 's/\\//g')             # Remove any backslashes
+
+          # Clean the tip text using a single-line sed command
+          TIP=$(echo "$TIP" | sed -e 's/[{}]//g' -e 's/\/\+/ /g' -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's/^"//' -e 's/"$//' -e 's/\\//g')
+
+          # Handle empty tips gracefully
+          if [[ -z "$TIP" ]]; then
+            TIP="Geen tip beschikbaar voor vandaag"
+          fi
+
           echo "tip=${TIP}" >> $GITHUB_OUTPUT
           echo "image_base=${IMAGE_BASE}" >> $GITHUB_OUTPUT
 
@@ -104,18 +105,17 @@ jobs:
 
       - name: Copy index.html
         run: |
-          echo "Current working directory: ${GITHUB_WORKSPACE}"
           TEMPLATE_CONTENT=$(cat index.html)
-          # Use parameter substitution with escaped replacement
+          # HTML-escape special characters
           CLEAN_TIP=$(echo "${{ steps.tip_info.outputs.tip }}" | sed 's/&/&amp;/g; s/</&lt;/g; s/>/&gt;/g')
-          UPDATED_CONTENT=$(echo "${TEMPLATE_CONTENT}" | awk -v tip="${CLEAN_TIP}" '{gsub("{{tip}}", tip); print}')
-          if [[ "${{ steps.download_image.outputs.image_exists }}" == "true" ]]; then
-            IMAGE_SECTION='<div id="tip-image"><img src="image.png" alt="Daily tip illustration" /></div>'
-          else
-            IMAGE_SECTION=''
-          fi
-          UPDATED_CONTENT=$(echo "${UPDATED_CONTENT}" | awk -v img="${IMAGE_SECTION}" '{gsub("{{image_section}}", img); print}')
-          echo "${UPDATED_CONTENT}" > index.html
+          
+          # Use awk for safer template replacement
+          UPDATED_CONTENT=$(awk -v tip="$CLEAN_TIP" -v img="$IMAGE_SECTION" '
+            BEGIN { gsub(/\\/, "\\\\", tip); gsub(/\\/, "\\\\", img) }
+            { gsub("{{tip}}", tip); gsub("{{image_section}}", img); print }
+          ' <<< "$TEMPLATE_CONTENT")
+          
+          echo "$UPDATED_CONTENT" > index.html
 
       - name: Prepare gh-pages branch
         run: |
