@@ -58,13 +58,14 @@ jobs:
         id: tip_info
         run: |
           DAY=$(date +%j | sed 's/^0*//')
-          # Read JSON from the file
           if [[ -s "decompressed_tips.json" ]]; then
-            TIP=$(jq -r ".tips[$((DAY-1))].text" decompressed_tips.json)
-            IMAGE_BASE=$(jq -r ".tips[$((DAY-1))].image" decompressed_tips.json)
+            TEMP_TIP=$(cat decompressed_tips.json | jq -r ".tips.text")
+            TEMP_IMAGE_BASE=$(cat decompressed_tips.json | jq -r ".tips.image")
+            echo "tip=$TEMP_TIP" >> "$GITHUB_OUTPUT"
+            echo "image_base=$TEMP_IMAGE_BASE" >> "$GITHUB_OUTPUT"
           else
-            TIP=""
-            IMAGE_BASE=""
+            echo "tip=" >> "$GITHUB_OUTPUT"
+            echo "image_base=" >> "$GITHUB_OUTPUT"
           fi
 
           # Clean the tip text using a single-line sed command
@@ -105,16 +106,14 @@ jobs:
 
       - name: Copy index.html
         run: |
+          echo "Current working directory: ${{ github.workspace }}"
           TEMPLATE_CONTENT=$(cat index.html)
-          # HTML-escape special characters
-          CLEAN_TIP=$(echo "${{ steps.tip_info.outputs.tip }}" | sed 's/&/&amp;/g; s/</&lt;/g; s/>/&gt;/g')
-          
-          # Use awk for safer template replacement
-          UPDATED_CONTENT=$(awk -v tip="$CLEAN_TIP" -v img="$IMAGE_SECTION" '
-            BEGIN { gsub(/\\/, "\\\\", tip); gsub(/\\/, "\\\\", img) }
-            { gsub("{{tip}}", tip); gsub("{{image_section}}", img); print }
-          ' <<< "$TEMPLATE_CONTENT")
-          
+          UPDATED_CONTENT=$(echo "$TEMPLATE_CONTENT" | sed "s#{{tip}}#${{ steps.tip_info.outputs.tip }}#g")
+          if [[ "${{ steps.download_image.outputs.image_exists }}" == "true" ]]; then
+            UPDATED_CONTENT=$(echo "$UPDATED_CONTENT" | sed "s#{{image_section}}# <div id=\"tip-image\"><img src=\"image.png\" alt=\"Daily tip illustration\" \/></div>#g")
+          else
+            UPDATED_CONTENT=$(echo "$UPDATED_CONTENT" | sed "s#{{image_section}}##g")
+          fi
           echo "$UPDATED_CONTENT" > index.html
 
       - name: Prepare gh-pages branch
