@@ -66,8 +66,16 @@ jobs:
             TIP=""
             IMAGE_BASE=""
           fi
-          echo "tip=$TIP" >> $GITHUB_OUTPUT
-          echo "image_base=$IMAGE_BASE" >> $GITHUB_OUTPUT
+          # Comprehensive cleaning using multiple methods
+          TIP=$(echo "$TIP" | \
+            sed -e 's/[{}]//g' \          # Remove curly braces
+                -e 's/\/\+/ /g' \         # Replace one or more slashes with space
+                -e 's/^[[:space:]]*//' \  # Trim leading whitespace
+                -e 's/[[:space:]]*$//' \  # Trim trailing whitespace
+                -e 's/^"//' -e 's/"$//' \ # Remove surrounding quotes
+                -e 's/\\//g')             # Remove any backslashes
+          echo "tip=${TIP}" >> $GITHUB_OUTPUT
+          echo "image_base=${IMAGE_BASE}" >> $GITHUB_OUTPUT
 
       - name: Download image if available
         id: download_image
@@ -96,15 +104,18 @@ jobs:
 
       - name: Copy index.html
         run: |
-          echo "Current working directory: ${{ github.workspace }}"
+          echo "Current working directory: ${GITHUB_WORKSPACE}"
           TEMPLATE_CONTENT=$(cat index.html)
-          UPDATED_CONTENT="${TEMPLATE_CONTENT//{{tip}}/${{ steps.tip_info.outputs.tip }}}"
+          # Use parameter substitution with escaped replacement
+          CLEAN_TIP=$(echo "${{ steps.tip_info.outputs.tip }}" | sed 's/&/&amp;/g; s/</&lt;/g; s/>/&gt;/g')
+          UPDATED_CONTENT=$(echo "${TEMPLATE_CONTENT}" | awk -v tip="${CLEAN_TIP}" '{gsub("{{tip}}", tip); print}')
           if [[ "${{ steps.download_image.outputs.image_exists }}" == "true" ]]; then
-            UPDATED_CONTENT="${UPDATED_CONTENT//{{image_section}}/ <div id=\"tip-image\"><img src=\"image.png\" alt=\"Daily tip illustration\" /></div>}"
+            IMAGE_SECTION='<div id="tip-image"><img src="image.png" alt="Daily tip illustration" /></div>'
           else
-            UPDATED_CONTENT="${UPDATED_CONTENT//{{image_section}}//}"
+            IMAGE_SECTION=''
           fi
-          echo "$UPDATED_CONTENT" > index.html
+          UPDATED_CONTENT=$(echo "${UPDATED_CONTENT}" | awk -v img="${IMAGE_SECTION}" '{gsub("{{image_section}}", img); print}')
+          echo "${UPDATED_CONTENT}" > index.html
 
       - name: Prepare gh-pages branch
         run: |
